@@ -26,6 +26,8 @@ dependencies:
 - diagrams-lib
 - diagrams-contrib
 - diagrams-svg
+- directory
+- parsec
 
 library:
   source-dirs: src

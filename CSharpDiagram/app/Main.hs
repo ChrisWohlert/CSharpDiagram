@@ -7,8 +7,10 @@ module Main where
 
 import Diagrams.Prelude
 import Diagrams.Backend.SVG.CmdLine
+import Lib
+import Class
+import Drawing
 
-myCircle :: Diagram B
-myCircle = circle 1
-
-main = mainWith myCircle
+main = do
+    types <- parseFiles "D:/haskell/CSharpDiagram/CSharpDiagram"
+    mainWith $ draw (Solution types)
