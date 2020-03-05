@@ -1,0 +1,19 @@
+<html>
+<head>
+<script src="jquery.js"></script>
+<script src="svg-pan-zoom.min.js"></script>
+</head>
+<body>
+<object id="svg" type="image/svg+xml" data="test.svg">
+</object>
+<script>	
+	test = function() {
+        svgPanZoom('#svg', {
+          zoomEnabled: true,
+          controlIconsEnabled: true
+        });
+      };	
+    window.onload = test;
+</script>
+</body>
+</html>

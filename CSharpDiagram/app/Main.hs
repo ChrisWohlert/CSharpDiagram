@@ -12,5 +12,5 @@ import Class
 import Drawing
 
 main = do
-    types <- parseFiles "D:/haskell/CSharpDiagram/CSharpDiagram"
+    types <- parseFiles "C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
     mainWith $ draw (Solution types)
