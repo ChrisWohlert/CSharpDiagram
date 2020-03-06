@@ -13,4 +13,4 @@ import Drawing
 
 main = do
     types <- parseFiles "C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
-    mainWith $ draw (Solution types)
+    mainWith $ draw (Solution $ take 1 types)

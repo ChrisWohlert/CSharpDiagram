@@ -5,7 +5,7 @@
 module Drawing where
 
 import Diagrams.Prelude
-import Diagrams.Backend.Html5.CmdLine
+import Diagrams.Backend.SVG.CmdLine
 import Lib
 import Class
 import Data.List
@@ -25,7 +25,7 @@ dashed  = dashingN [0.03,0.03] 0
 instance Drawing Solution where
     draw (Solution types) = header === travelPacked (frame 2 . draw) (|||) (===) (pack types)
         where
-            header = frame 5 $ fontSize (normalized 0.1) $ p $ "Number of classes: " ++ (show $ length types)
+            header = frame 5 $ fontSize (normalized 0.05) $ p $ "Number of classes: " ++ (show $ length types)
 
 instance Drawing Type where
     draw c@(Class _ _ _ _ _ _ name _ _ members _) = contents <> bounds
