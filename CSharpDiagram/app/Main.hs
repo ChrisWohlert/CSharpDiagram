@@ -16,9 +16,9 @@ import qualified System.IO.Strict as S
 
 main = do
     print "Parsing"
-    solution <- parseFiles "D:/haskell/CSharpDiagram/CSharpDiagram/test-data/src"
+    solution <- parseFiles "C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
     print "Creating diagram"
-    renderSVG "test.svg" (dims 2000) (draw solution # svgId "solution")
+    renderSVG "test.svg" (dims 1600) (draw solution # svgId "solution")
     print "Updating index.html"
     handle <- openFile "test.svg" ReadMode
     contents <- hGetContents handle

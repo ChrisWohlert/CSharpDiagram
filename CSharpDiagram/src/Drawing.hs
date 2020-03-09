@@ -34,7 +34,7 @@ instance Drawing Namespace where
             drawnNamespaces = layoutDiagramsAsGrid nss
             drawnTypes = layoutDiagramsAsGrid types
         in
-            header === (drawnTypes === drawnNamespaces) # boundByRect 0.6 # svgClass "namespace"
+            header === (drawnTypes === drawnNamespaces) # boundByRect 0.6 # svgClass "namespace "
 
 boundByRect w contents = contents <> (boundingRect contents) # lw w
 
