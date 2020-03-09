@@ -1,36 +1,46 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE TypeFamilies              #-}
+{-# LANGUAGE FlexibleInstances         #-}
 
 module Drawing where
 
 import Diagrams.Prelude
-import Diagrams.Backend.SVG.CmdLine
+import Diagrams.Backend.SVG
 import Lib
 import Class
 import Data.List
 import Packer
+import Data.List.Split
 
 class Drawing a where
     draw :: a -> Diagram B
 
-instance Packable Type where
-    packingDims (Class _ _ _ _ _ _ _ _ _ members _) = (30, 4 + (fromIntegral $ sum $ map getMemberHeight members))
-    packingDims (Enum _ _ _ _ _ _) = (30, 10)
+instance Packable (QDiagram B V2 Double Any) where
+    packingDims d = (width d, height d)
 
-getMemberHeight m = 1 + (length $ getParameters m)
+layoutDiagramsAsGrid = maybe (strutX 0) (travelPacked (frame 1) (|||) (===)) . pack . map draw
 
 dashed  = dashingN [0.03,0.03] 0
 
 instance Drawing Solution where
-    draw (Solution types) = header === travelPacked (frame 2 . draw) (|||) (===) (pack types)
-        where
-            header = frame 5 $ fontSize (normalized 0.05) $ p $ "Number of classes: " ++ (show $ length types)
+    draw (Solution nss) = layoutDiagramsAsGrid nss
+
+instance Drawing Namespace where
+    draw (Namespace name nss types) = 
+        let 
+            headerSize = if not ('.' `elem` name) then 10 else 6
+            header = splitOn "." name # intercalate ".\n"  # p # scale headerSize # frame 5 
+            drawnNamespaces = layoutDiagramsAsGrid nss
+            drawnTypes = layoutDiagramsAsGrid types
+        in
+            header === (drawnTypes === drawnNamespaces) # boundByRect 0.6 # svgClass "namespace"
+
+boundByRect w contents = contents <> (boundingRect contents) # lw w
 
 instance Drawing Type where
-    draw c@(Class _ _ _ _ _ _ name _ _ members _) = contents <> bounds
+    draw c@(Class _ _ _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # svgClass "class " 
         where 
-            bounds = boundingRect (contents # frame 1) # lw 0.6
             contents = strutY 1 === vsep memberSpace ([draw name] ++ map draw members) 
     draw _ = strutY 10
 
@@ -83,7 +93,7 @@ underline = strutY memberHeight === hrule memberWidth # lw 0.3 # alignL
 
 h1 t = p t # scale 1.4 # bold === underline
 
-p t = vsep 1 $ map (alignedText 0 0.5) $ lines t
+p t = vsep 1 $ map (frame 0.5) $ map (alignedText 0 0.5) $ lines t
 
 textInBox e t = (e t ||| strutX memberWidth) === underline
 

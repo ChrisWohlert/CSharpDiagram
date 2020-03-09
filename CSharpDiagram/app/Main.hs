@@ -6,11 +6,24 @@
 module Main where
 
 import Diagrams.Prelude
-import Diagrams.Backend.SVG.CmdLine
+import Diagrams.Backend.SVG
 import Lib
 import Class
 import Drawing
+import System.IO
+import Data.List.Split
+import qualified System.IO.Strict as S
 
 main = do
-    types <- parseFiles "C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
-    mainWith $ draw (Solution $ take 1 types)
+    print "Parsing"
+    solution <- parseFiles "D:/haskell/CSharpDiagram/CSharpDiagram/test-data/src"
+    print "Creating diagram"
+    renderSVG "test.svg" (dims 2000) (draw solution # svgId "solution")
+    print "Updating index.html"
+    handle <- openFile "test.svg" ReadMode
+    contents <- hGetContents handle
+    html <- S.readFile "index.html"
+    let (start:svg:end:[]) = splitOn "<!-- SVG -->" html
+    let result = (start ++ "<!-- SVG -->" ++ contents ++ "<!-- SVG -->" ++ end)
+    writeFile "index.html" result
+

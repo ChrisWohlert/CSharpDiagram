@@ -26,6 +26,8 @@ import Control.Monad
 import System.Exit
 import Data.Either
 import Data.List
+import Data.Function (on)
+import Debug.Trace
 
 run_parse :: (GenParser Char () a) -> String -> String -> Either ParseError a
 run_parse rule input source = parse rule source input
@@ -371,7 +373,7 @@ parseClass us ns = do
     constraints <- try (parseConstraints <* trim) <|> return ""
     char '{' <* trim
     members <- parseMembers
-    return $ C.Class us ns visibility safe abstract isInterface className baseClasses constraints members attrs
+    return $ C.Class us ns visibility safe abstract isInterface className baseClasses constraints members attrs []
 
 parseEnum us ns = do
     attrs <- parseAttributes <* trim
@@ -400,26 +402,42 @@ run_parseType contents source = case run_parse removeComments contents source of
     Right text -> run_parse parseType text source
     Left err -> Left err
 
-parseFiles :: String -> IO ([C.Type])
+parseFiles :: String -> IO (C.Solution)
 parseFiles dir = do
     files <- getFilesFromDir dir
     types <- mapM getContent files
     let dependencies = mapDependencies $ rights types
+    let namespaces = mapNamespaces dependencies
     print $ lefts types
-    return $ rights types
+    return $ C.Solution namespaces
 
-mapDependencies :: [C.Type] -> [(C.Type, [C.Type])]
+mapDependencies :: [C.Type] -> [C.Type]
 mapDependencies types = map mapDependenciesForType types
     where
         mapDependenciesForType t = 
-            let datatypes = C.getDatatypes t
-            in (t, filter (isDependency datatypes (C.class_usings t) (C.class_namespace t)) types)
-        isDependency datatypes usings namespace (C.Class _ ns _ _ _ _ (C.ClassName name) _ _ _ _) = (ns `isInfixOf` namespace || any (ns `isInfixOf`) usings) && any (hasName name) datatypes
-        isDependency datatypes usings namespace (C.Class _ ns _ _ _ _ (C.GenericClassName name _) _ _ _ _) = (ns `isInfixOf` namespace || any (ns `isInfixOf`) usings) && any (hasName name) datatypes
+            let 
+                datatypes = C.getDatatypes t
+                deps = map C.class_name $ filter (isDependency datatypes (C.class_usings t) (C.namespace t)) types
+            in
+                setDeps t deps
+        isDependency datatypes usings namespace (C.Class _ ns _ _ _ _ (C.ClassName name) _ _ _ _ _) = (ns `isInfixOf` namespace || any (ns `isInfixOf`) usings) && any (hasName name) datatypes
+        isDependency datatypes usings namespace (C.Class _ ns _ _ _ _ (C.GenericClassName name _) _ _ _ _ _) = (ns `isInfixOf` namespace || any (ns `isInfixOf`) usings) && any (hasName name) datatypes
         isDependency datatypes usings namespace _ = False
-        hasName name (C.Single n) = name == n
-        hasName name (C.List d) = hasName name d
-        hasName name (C.Generic d ds) = hasName name d || any (hasName name) ds -- Something is missing. If you depend on Volume<T>, it gives you deps to both Volume and Volume<T>
+        hasName name (C.Single n) = trace name $ name == n
+        hasName name (C.List d) = trace name $ hasName name d
+        hasName name (C.Generic d ds) = trace name $ hasName name d || any (hasName name) ds -- Something is missing. If you depend on Volume<T>, it gives you deps to both Volume and Volume<T>
+        setDeps e@(C.Enum _ _ _ _ _ _) _ = e
+        setDeps c deps =  c { C.class_dependencies = [] }
+
+mapNamespaces :: [C.Type] -> [C.Namespace]
+mapNamespaces types =
+    let
+        namespaces = map (\ ts -> C.Namespace (C.namespace (head ts)) [] ts) $ groupBy ((==) `on` C.namespace) types
+    in
+        map (mapNamespaces' namespaces) namespaces
+
+mapNamespaces' :: [C.Namespace] -> C.Namespace -> C.Namespace
+mapNamespaces' nss (C.Namespace name _ types) = C.Namespace name (filter (\ (C.Namespace name' _ _) -> name == (reverse $ drop 1 $ dropWhile (/= '.') $ reverse name')) nss) types
 
 getContent :: String -> IO (Either ParseError C.Type)
 getContent file = do

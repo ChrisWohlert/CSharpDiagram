@@ -1,0 +1,5 @@
+
+
+.namespace:not(.class):hover {
+    stroke-width: 5;
+}

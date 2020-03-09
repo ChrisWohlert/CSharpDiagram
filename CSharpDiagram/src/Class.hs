@@ -64,7 +64,7 @@ data Member = Property (Maybe Modifier) Datatype PropertyName (Maybe GetSet) Val
 data Safe = Safe | Unsafe deriving (Show, Eq)
 
 data Type = Class { class_usings :: [String]
-                  , class_namespace :: String
+                  , namespace :: String
                   , class_visibility :: Visibility
                   , class_safe :: Safe
                   , class_abstract :: Abstract
@@ -74,9 +74,10 @@ data Type = Class { class_usings :: [String]
                   , class_constraints :: Constraints
                   , class_members :: [Member]
                   , class_attributes :: [Attribute]
+                  , class_dependencies :: [ClassName]
                   } |
             Enum { enum_usings :: [String]
-                 , enum_namespace :: String
+                 , namespace :: String
                  , enum_visibility :: Visibility
                  , enum_name :: Name
                  , elements :: [String]
@@ -84,7 +85,9 @@ data Type = Class { class_usings :: [String]
                  }
             deriving (Show, Eq)
 
-data Solution = Solution [Type]
+data Solution = Solution [Namespace]
+
+data Namespace = Namespace Name [Namespace] [Type]
 
 class HasDatatypes a where
      getDatatypes :: a -> [Datatype]
@@ -114,7 +117,7 @@ instance HasParameters MethodSignature where
      getParameters (MethodSignature visibility static modifier returnType methodName parameters constraints attributes) = parameters
 
 instance HasDatatypes Type where
-     getDatatypes (Class _ _ _ _ _ _ _ _ _ members _) = concat $ map getDatatypes members
+     getDatatypes (Class _ _ _ _ _ _ _ _ _ members _ _) = concat $ map getDatatypes members
      getDatatypes _ = []
 
 instance HasDatatypes Parameter where
@@ -137,3 +140,6 @@ instance HasDatatypes Member where
      getDatatypes (StaticConstructor parameters _) = concat $ map getDatatypes parameters
      getDatatypes (Desctructor parameters _) = concat $ map getDatatypes parameters
      getDatatypes (Method method) = getDatatypes method
+     getDatatypes (InnerType _) = []
+     getDatatypes (Event _ _ _) = []
+     getDatatypes (Region _) = []

@@ -28,6 +28,8 @@ dependencies:
 - diagrams-svg
 - directory
 - parsec
+- split
+- strict
 
 library:
   source-dirs: src
@@ -39,7 +41,8 @@ executables:
     ghc-options:
     - -threaded
     - -rtsopts
-    - -with-rtsopts=-N
+    - -with-rtsopts=-N 
+    - -fwarn-incomplete-patterns 
     dependencies:
     - CSharpDiagram
 
@@ -51,5 +54,6 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fwarn-incomplete-patterns 
     dependencies:
     - CSharpDiagram

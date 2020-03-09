@@ -18,12 +18,13 @@ class Packable a where
 makePacked :: (Packable a) => a -> Packed a
 makePacked m = Packed Nothing Nothing m
 
-pack :: Packable a => [a] -> Packed a
+pack :: Packable a => [a] -> Maybe (Packed a)
+pack [] = Nothing
 pack packables = 
     let 
         (p:ps) = map makePacked $ reverse $ sortOn (\ a -> let (x, y) = packingDims a in x * y) packables
     in
-        pack' p ps
+        Just $ pack' p ps
 
 pack' p [] = p
 pack' c@(Packed east south m) (p:ps) = 
