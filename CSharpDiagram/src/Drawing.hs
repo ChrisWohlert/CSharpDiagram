@@ -12,6 +12,7 @@ import Class
 import Data.List
 import Packer
 import Data.List.Split
+import Diagrams.Names
 
 class Drawing a where
     draw :: a -> Diagram B
@@ -19,12 +20,14 @@ class Drawing a where
 instance Packable (QDiagram B V2 Double Any) where
     packingDims d = (width d, height d)
 
+instance IsName ClassName
+
 layoutDiagramsAsGrid = maybe (strutX 0) (travelPacked (frame 1) (|||) (===)) . pack . map draw
 
 dashed  = dashingN [0.03,0.03] 0
 
 instance Drawing Solution where
-    draw (Solution nss) = layoutDiagramsAsGrid nss
+    draw (Solution nss) = drawDependencies (concatMap getAllTypesFromNamespace nss) (layoutDiagramsAsGrid nss)
 
 instance Drawing Namespace where
     draw (Namespace name nss types) = 
@@ -39,7 +42,7 @@ instance Drawing Namespace where
 boundByRect w contents = contents <> (boundingRect contents) # lw w
 
 instance Drawing Type where
-    draw c@(Class _ _ _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # svgClass "class " 
+    draw c@(Class _ _ _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # svgClass "class " # named name
         where 
             contents = strutY 1 === vsep memberSpace ([draw name] ++ map draw members) 
     draw _ = strutY 10
@@ -104,3 +107,18 @@ memberSpace = 1.2
 memberHeight = 0.6
 
 memberWidth = 30
+
+drawDependencies :: [Type] -> (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
+drawDependencies types = \ d -> (compose (concat (map drawDependenciesForType types)) d)
+    where
+        drawDependenciesForType :: Type -> [(QDiagram B V2 Double Any -> QDiagram B V2 Double Any)]
+        drawDependenciesForType t = map (drawDependency $ class_name t) $ class_dependencies t
+
+drawDependency :: ClassName -> ClassName -> (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
+drawDependency c d = 
+    withName c $ \rb ->
+    withName d $ \cb ->
+      atop (boundaryFrom rb unit_Y ~~ boundaryFrom cb unitY)
+
+compose :: [a -> a] -> a -> a
+compose fs v = foldl (flip (.)) id fs $ v

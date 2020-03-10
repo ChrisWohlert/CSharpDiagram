@@ -25,7 +25,7 @@ data Static = Static | NonStatic deriving (Show, Eq)
 
 data Visibility = Protected | Private | Public | Internal | Unset deriving (Show, Eq)
 
-data ClassName = ClassName Name | GenericClassName Name String deriving (Show, Eq)
+data ClassName = ClassName Name | GenericClassName Name String deriving (Show, Eq, Ord)
 
 data MethodName = MethodName Name | GenericMethodName Name String deriving (Show, Eq)
 
@@ -143,3 +143,6 @@ instance HasDatatypes Member where
      getDatatypes (InnerType _) = []
      getDatatypes (Event _ _ _) = []
      getDatatypes (Region _) = []
+
+
+getAllTypesFromNamespace (Namespace _ ns types) = types ++ (concatMap getAllTypesFromNamespace ns)

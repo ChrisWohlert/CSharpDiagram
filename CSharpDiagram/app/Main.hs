@@ -18,7 +18,7 @@ main = do
     print "Parsing"
     solution <- parseFiles "C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
     print "Creating diagram"
-    renderSVG "test.svg" (dims 1600) (draw solution # svgId "solution")
+    renderSVG "test.svg" (dims 1600) (draw solution)
     print "Updating index.html"
     handle <- openFile "test.svg" ReadMode
     contents <- hGetContents handle
