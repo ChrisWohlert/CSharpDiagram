@@ -69,21 +69,23 @@ data Type = Class { class_usings :: [String]
                   , class_safe :: Safe
                   , class_abstract :: Abstract
                   , class_isInterface :: Bool
-                  , class_name :: ClassName
+                  , name :: ClassName
                   , class_baseClasses :: [BaseClass]
                   , class_constraints :: Constraints
                   , class_members :: [Member]
                   , class_attributes :: [Attribute]
-                  , class_dependencies :: [ClassName]
+                  , class_dependencies :: [FullName]
                   } |
             Enum { enum_usings :: [String]
                  , namespace :: String
                  , enum_visibility :: Visibility
-                 , enum_name :: Name
+                 , name :: ClassName
                  , elements :: [String]
                  , enum_attributes :: [Attribute]
                  }
             deriving (Show, Eq)
+
+data FullName = FullName String ClassName deriving (Show, Eq, Ord)
 
 data Solution = Solution [Namespace]
 
@@ -146,3 +148,8 @@ instance HasDatatypes Member where
 
 
 getAllTypesFromNamespace (Namespace _ ns types) = types ++ (concatMap getAllTypesFromNamespace ns)
+
+dependencies (Class _ _ _ _ _ _ _ _ _ _ _ deps) = deps
+dependencies _ = []
+
+fullname t = FullName (namespace t) (name t)

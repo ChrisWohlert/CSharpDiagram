@@ -13,6 +13,8 @@ import Data.List
 import Packer
 import Data.List.Split
 import Diagrams.Names
+import Data.Colour.Palette.BrewerSet
+import qualified Debug.Trace as D
 
 class Drawing a where
     draw :: a -> Diagram B
@@ -20,7 +22,7 @@ class Drawing a where
 instance Packable (QDiagram B V2 Double Any) where
     packingDims d = (width d, height d)
 
-instance IsName ClassName
+instance IsName FullName
 
 layoutDiagramsAsGrid = maybe (strutX 0) (travelPacked (frame 1) (|||) (===)) . pack . map draw
 
@@ -42,9 +44,9 @@ instance Drawing Namespace where
 boundByRect w contents = contents <> (boundingRect contents) # lw w
 
 instance Drawing Type where
-    draw c@(Class _ _ _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # svgClass "class " # named name
+    draw c@(Class _ ns _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # fc white # frame 7 # svgClass "class " # named (fullname c)
         where 
-            contents = strutY 1 === vsep memberSpace ([draw name] ++ map draw members) 
+            contents = strutY 1 === vsep memberSpace ([draw name] ++ map draw members) # fc black
     draw _ = strutY 10
 
 instance Drawing ClassName where
@@ -112,13 +114,26 @@ drawDependencies :: [Type] -> (QDiagram B V2 Double Any -> QDiagram B V2 Double 
 drawDependencies types = \ d -> (compose (concat (map drawDependenciesForType types)) d)
     where
         drawDependenciesForType :: Type -> [(QDiagram B V2 Double Any -> QDiagram B V2 Double Any)]
-        drawDependenciesForType t = map (drawDependency $ class_name t) $ class_dependencies t
+        drawDependenciesForType c = map (\ (d,a) -> drawDependency (fullname c) d a) $ zip (dependencies c) $ brewerSet Paired (length $ dependencies c)
 
-drawDependency :: ClassName -> ClassName -> (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
-drawDependency c d = 
+drawDependency c d a = 
     withName c $ \rb ->
     withName d $ \cb ->
-      atop (boundaryFrom rb unit_Y ~~ boundaryFrom cb unitY)
+        let
+            v = location rb .-. location cb
+            v2 = location cb .-. location rb
+            b1 = boundaryFrom rb v2
+            b2 = boundaryFrom cb v
+            shaft = arc xDir (1/4 @@turn)
+            arrow = arrowBetween' (with & arrowShaft .~ shaft
+                                        & arrowHead .~ tri 
+                                        & headLength .~ 2
+                                        & headStyle %~ fc a . opacity 0.5
+                                        & shaftStyle %~ lw 0.30 . lc a . opacity 0.5)
+            FullName cns _ = c
+            FullName dns _ = d
+        in
+             flip atop ((arrow b1 b2) # (svgClass "dependency ") # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " ")) # (svgClass ("dependency-" ++ (filter (/= '.') dns) ++ " ")))
 
 compose :: [a -> a] -> a -> a
 compose fs v = foldl (flip (.)) id fs $ v

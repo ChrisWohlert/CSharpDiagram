@@ -379,7 +379,7 @@ parseEnum us ns = do
     attrs <- parseAttributes <* trim
     visibility <- trim >> parseVisibility <* trim
     string "enum" <* trim
-    name <- many1 alphaNum <* trim
+    name <- parseClassName <* trim
     char '{' <* trim
     elements <- parseEnumElements
     return $ C.Enum us ns visibility name elements attrs
@@ -417,17 +417,17 @@ mapDependencies types = map mapDependenciesForType types
         mapDependenciesForType t = 
             let 
                 datatypes = C.getDatatypes t
-                deps = map C.class_name $ filter (isDependency datatypes (C.class_usings t) (C.namespace t)) types
+                deps = map C.fullname $ filter (/= t) $ filter (isDependency datatypes (C.class_usings t) (C.namespace t)) types
             in
                 setDeps t deps
         isDependency datatypes usings namespace (C.Class _ ns _ _ _ _ (C.ClassName name) _ _ _ _ _) = (ns `isInfixOf` namespace || any (ns `isInfixOf`) usings) && any (hasName name) datatypes
         isDependency datatypes usings namespace (C.Class _ ns _ _ _ _ (C.GenericClassName name _) _ _ _ _ _) = (ns `isInfixOf` namespace || any (ns `isInfixOf`) usings) && any (hasName name) datatypes
         isDependency datatypes usings namespace _ = False
-        hasName name (C.Single n) = trace name $ name == n
-        hasName name (C.List d) = trace name $ hasName name d
-        hasName name (C.Generic d ds) = trace name $ hasName name d || any (hasName name) ds -- Something is missing. If you depend on Volume<T>, it gives you deps to both Volume and Volume<T>
+        hasName name (C.Single n) = name == n
+        hasName name (C.List d) = hasName name d
+        hasName name (C.Generic d ds) = hasName name d || any (hasName name) ds -- Something is missing. If you depend on Volume<T>, it gives you deps to both Volume and Volume<T>
         setDeps e@(C.Enum _ _ _ _ _ _) _ = e
-        setDeps c deps =  c { C.class_dependencies = [] }
+        setDeps c deps =  c { C.class_dependencies = deps }
 
 mapNamespaces :: [C.Type] -> [C.Namespace]
 mapNamespaces types =

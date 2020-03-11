@@ -16,7 +16,7 @@ import qualified System.IO.Strict as S
 
 main = do
     print "Parsing"
-    solution <- parseFiles "C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
+    solution <- parseFiles "D:/haskell/CSharpDiagram/CSharpDiagram" --"C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
     print "Creating diagram"
     renderSVG "test.svg" (dims 1600) (draw solution)
     print "Updating index.html"
@@ -24,6 +24,6 @@ main = do
     contents <- hGetContents handle
     html <- S.readFile "index.html"
     let (start:svg:end:[]) = splitOn "<!-- SVG -->" html
-    let result = (start ++ "<!-- SVG -->" ++ contents ++ "<!-- SVG -->" ++ end)
+    let result = (start ++ "<!-- SVG -->" ++ contents ++ "<!-- SVG -->" ++ end) 
     writeFile "index.html" result
 
