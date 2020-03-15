@@ -32,6 +32,8 @@ dependencies:
 - strict
 - palette
 - colour
+- containers
+- extra
 
 library:
   source-dirs: src

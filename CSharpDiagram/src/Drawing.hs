@@ -14,6 +14,7 @@ import Packer
 import Data.List.Split
 import Diagrams.Names
 import Data.Colour.Palette.BrewerSet
+import PathFinder
 import qualified Debug.Trace as D
 
 class Drawing a where
@@ -111,7 +112,7 @@ memberHeight = 0.6
 memberWidth = 30
 
 drawDependencies :: [Type] -> (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
-drawDependencies types = \ d -> (compose (concat (map drawDependenciesForType types)) d)
+drawDependencies types = \ d -> (compose (concat (map drawDependenciesForType (take 2 $ types))) d)
     where
         drawDependenciesForType :: Type -> [(QDiagram B V2 Double Any -> QDiagram B V2 Double Any)]
         drawDependenciesForType c = map (\ (d,a) -> drawDependency (fullname c) d a) $ zip (dependencies c) $ brewerSet Paired (length $ dependencies c)
@@ -121,19 +122,21 @@ drawDependency c d a =
     withName d $ \cb ->
         let
             v = location rb .-. location cb
+            (vx, vy) = unr2 v
             v2 = location cb .-. location rb
-            b1 = boundaryFrom rb v2
-            b2 = boundaryFrom cb v
-            shaft = arc xDir (1/4 @@turn)
-            arrow = arrowBetween' (with & arrowShaft .~ shaft
-                                        & arrowHead .~ tri 
-                                        & headLength .~ 2
-                                        & headStyle %~ fc a . opacity 0.5
-                                        & shaftStyle %~ lw 0.30 . lc a . opacity 0.5)
+            b1 = boundaryFrom rb v
+            b2 = boundaryFrom cb v2
+            path = buildPath (Pair (unp2 $ b1)) (Pair (unp2 b2)) (cost (Pair (unp2 $ b2)))
+            shaft = trailFromVertices (map (p2 . getPair) path)
             FullName cns _ = c
             FullName dns _ = d
         in
-             flip atop ((arrow b1 b2) # (svgClass "dependency ") # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " ")) # (svgClass ("dependency-" ++ (filter (/= '.') dns) ++ " ")))
+             flip atop ((shaft # strokeTrail) # (svgClass "dependency ") # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " ")) # (svgClass ("dependency-" ++ (filter (/= '.') dns) ++ " ")))
+
+cost :: Pair -> Pair -> Double
+cost (Pair (destinationX, destinationY)) (Pair (x, y)) =  let distance = (sqrt $ (destinationX - x) ** 2 + (destinationY - y) ** 2) in D.trace (show distance) (distance ** 8)
+
+floorP p = let (x, y) = unp2 p in (fromIntegral (floor x) ^& fromIntegral (floor y))
 
 compose :: [a -> a] -> a -> a
 compose fs v = foldl (flip (.)) id fs $ v
