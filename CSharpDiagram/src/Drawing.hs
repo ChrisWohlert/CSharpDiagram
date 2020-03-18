@@ -15,6 +15,12 @@ import Data.List.Split
 import Diagrams.Names
 import Data.Colour.Palette.BrewerSet
 import PathFinder
+import Diagrams.TwoD.Arrow
+import Data.Maybe
+import Diagrams.Trail
+import Safe
+
+
 import qualified Debug.Trace as D
 
 class Drawing a where
@@ -111,32 +117,47 @@ memberHeight = 0.6
 
 memberWidth = 30
 
-drawDependencies :: [Type] -> (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
-drawDependencies types = \ d -> (compose (concat (map drawDependenciesForType (take 2 $ types))) d)
+drawDependencies :: [Type] -> (QDiagram B V2 Double Any) -> (QDiagram B V2 Double Any)
+drawDependencies types diag = compose (concatMap (drawDependenciesForType diag types) (take 2 $ types)) diag
     where
-        drawDependenciesForType :: Type -> [(QDiagram B V2 Double Any -> QDiagram B V2 Double Any)]
-        drawDependenciesForType c = map (\ (d,a) -> drawDependency (fullname c) d a) $ zip (dependencies c) $ brewerSet Paired (length $ dependencies c)
+        drawDependenciesForType :: QDiagram B V2 Double Any -> [Type] -> Type -> [(QDiagram B V2 Double Any -> QDiagram B V2 Double Any)]
+        drawDependenciesForType diag types c = map fromJust $ filter isJust $ map (\ (d,a) -> drawDependency (fullname c) d a (map fullname types) diag) $ zip (dependencies c) $ brewerSet Paired (length $ dependencies c)
 
-drawDependency c d a = 
-    withName c $ \rb ->
-    withName d $ \cb ->
-        let
-            v = location rb .-. location cb
-            (vx, vy) = unr2 v
-            v2 = location cb .-. location rb
-            b1 = boundaryFrom rb v
-            b2 = boundaryFrom cb v2
-            path = buildPath (Pair (unp2 $ b1)) (Pair (unp2 b2)) (cost (Pair (unp2 $ b2)))
-            shaft = trailFromVertices (map (p2 . getPair) path)
-            FullName cns _ = c
-            FullName dns _ = d
-        in
-             flip atop ((shaft # strokeTrail) # (svgClass "dependency ") # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " ")) # (svgClass ("dependency-" ++ (filter (/= '.') dns) ++ " ")))
-
-cost :: Pair -> Pair -> Double
-cost (Pair (destinationX, destinationY)) (Pair (x, y)) =  let distance = (sqrt $ (destinationX - x) ** 2 + (destinationY - y) ** 2) in D.trace (show distance) (distance ** 8)
+drawDependency :: FullName -> FullName -> Colour Double -> [FullName] -> (QDiagram B V2 Double Any) -> Maybe (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
+drawDependency c d a types diag = do
+    rb <- lookupName c diag
+    cb <- lookupName d diag
+    let v = location rb .-. location cb
+    let v2 = location cb .-. location rb
+    let b1 = boundaryFrom rb v
+    let b2 = boundaryFrom cb v2
+    let dir = fromDirection $ direction v2
+    let allClassDiagrams = map getSub $ map fromJust $ filter isJust $ map (flip lookupName diag) types
+    let fullpath = unfoldr (\ b -> let 
+                                        nextB = b .+^ dir
+                                        continue = abs (pointsDistance b b2) > abs (pointsDistance nextB b2)
+                                    in 
+                                        if continue then 
+                                            case (headMay $ filter (flip inquire b) allClassDiagrams) of 
+                                                Just d  -> D.trace (show $ height d) (Just (Just (b .+^ (0 ^& (-40))), nextB))
+                                                Nothing -> Just (Nothing, nextB)
+                                        else 
+                                            Nothing) b1
+    let trail = fromVertices $ b2 : (map fromJust $ filter isJust $ fullpath) ++ [b1]
+    let arrow = arrowFromLocatedTrail' (with & headLength .~ 2) trail
+    let FullName cns _ = c
+    let FullName dns _ = d
+    return (flip atop ((arrow # lw 0.3) # (svgClass "dependency ") 
+                                    # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " "))))
 
 floorP p = let (x, y) = unp2 p in (fromIntegral (floor x) ^& fromIntegral (floor y))
 
 compose :: [a -> a] -> a -> a
 compose fs v = foldl (flip (.)) id fs $ v
+
+pointsDistance p1 p2 = 
+    let
+        (x1 :& y1) = coords p1
+        (x2 :& y2) = coords p2
+    in 
+        sqrt $ (x2 - x1) ** 2 + (y2 - y1) ** 2

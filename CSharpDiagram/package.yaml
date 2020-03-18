@@ -34,6 +34,7 @@ dependencies:
 - colour
 - containers
 - extra
+- safe
 
 library:
   source-dirs: src
