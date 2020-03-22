@@ -51,7 +51,7 @@ instance Drawing Namespace where
 boundByRect w contents = contents <> (boundingRect contents) # lw w
 
 instance Drawing Type where
-    draw c@(Class _ ns _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # fc white # frame 7 # svgClass "class " # named (fullname c)
+    draw c@(Class _ ns _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # fc lightgrey # named (fullname c) # frame 7 # svgClass "class "
         where 
             contents = strutY 1 === vsep memberSpace ([draw name] ++ map draw members) # fc black
     draw _ = strutY 10
@@ -118,7 +118,7 @@ memberHeight = 0.6
 memberWidth = 30
 
 drawDependencies :: [Type] -> (QDiagram B V2 Double Any) -> (QDiagram B V2 Double Any)
-drawDependencies types diag = compose (concatMap (drawDependenciesForType diag types) (take 2 $ types)) diag
+drawDependencies types diag = compose (concatMap (drawDependenciesForType diag types) (take 1 $ types)) diag
     where
         drawDependenciesForType :: QDiagram B V2 Double Any -> [Type] -> Type -> [(QDiagram B V2 Double Any -> QDiagram B V2 Double Any)]
         drawDependenciesForType diag types c = map fromJust $ filter isJust $ map (\ (d,a) -> drawDependency (fullname c) d a (map fullname types) diag) $ zip (dependencies c) $ brewerSet Paired (length $ dependencies c)
@@ -129,28 +129,55 @@ drawDependency c d a types diag = do
     cb <- lookupName d diag
     let v = location rb .-. location cb
     let v2 = location cb .-. location rb
-    let b1 = boundaryFrom rb v
-    let b2 = boundaryFrom cb v2
-    let dir = fromDirection $ direction v2
-    let allClassDiagrams = map getSub $ map fromJust $ filter isJust $ map (flip lookupName diag) types
-    let fullpath = unfoldr (\ b -> let 
-                                        nextB = b .+^ dir
-                                        continue = abs (pointsDistance b b2) > abs (pointsDistance nextB b2)
-                                    in 
-                                        if continue then 
-                                            case (headMay $ filter (flip inquire b) allClassDiagrams) of 
-                                                Just d  -> D.trace (show $ height d) (Just (Just (b .+^ (0 ^& (-40))), nextB))
-                                                Nothing -> Just (Nothing, nextB)
-                                        else 
-                                            Nothing) b1
-    let trail = fromVertices $ b2 : (map fromJust $ filter isJust $ fullpath) ++ [b1]
-    let arrow = arrowFromLocatedTrail' (with & headLength .~ 2) trail
+    let b1 = boundaryFrom rb v2
+    let b2 = boundaryFrom cb v
+    let allClassDiagrams = map getSub $ map fromJust $ filter isJust $ map (flip lookupName diag) $ types \\ [c, d]
+    let fullpath = drawDArrow b1 b2 allClassDiagrams
+    let trail = fromVertices fullpath
+    let arrow = (lw 0.3 . mconcat . zipWith lc colors . map strokeLocTrail . explodeTrail) trail
     let FullName cns _ = c
     let FullName dns _ = d
-    return (flip atop ((arrow # lw 0.3) # (svgClass "dependency ") 
-                                    # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " "))))
+    return (atop ((arrow # lw 0.3) # (svgClass "dependency ") 
+                                   # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " "))))
 
-floorP p = let (x, y) = unp2 p in (fromIntegral (floor x) ^& fromIntegral (floor y))
+colors = cycle [aqua, orange, deeppink, blueviolet, crimson, darkgreen]
+
+drawDArrow :: (Point V2 Double) -> (Point V2 Double) -> [QDiagram B V2 Double Any] -> [Point V2 Double]
+drawDArrow start end allClassDiagrams = start : (drawFromTo start end) ++ [end]
+    where
+        drawFromTo start end = 
+            let 
+                dir = scale 5 $ fromDirection $ direction (end .-. start)
+                backtrack = rotate halfTurn dir
+                nextStep = start .+^ dir
+                (x :& _) = coords nextStep
+                (xEnd :& _) = coords end
+                continue = (D.trace (show (x, xEnd))) $ floor x == floor xEnd
+            in 
+                if (continue) then
+                    case (headMay $ filter (flip inquire nextStep) allClassDiagrams) of
+                        Just d -> 
+                            let 
+                                adjusted = around start d end backtrack 
+                            in
+                                drawFromTo adjusted end ++ [adjusted, start]
+                        Nothing -> drawFromTo nextStep end
+                else
+                    []
+
+keep xs@(x:_) f = x : (keep' xs f)
+keep [] f = []
+
+keep' [] _ = []
+keep' (x:xx:xs) f = (keep (f x xx) f) ++ (keep (xx:xs) f)
+keep' (x:[]) _ = [x]
+
+top b = b .+^ (0 ^& 5)
+left b = b .+^ ((-5) ^& 0)
+bottom b = b .+^ (0 ^& (-5)) 
+right b = b .+^ (5 ^& 0) 
+around :: (Point V2 Double) -> (QDiagram B V2 Double Any) -> (Point V2 Double) -> V2 Double -> (Point V2 Double)
+around b d destination backtrack = head $ sortOn (pointsDistance destination) $ filter (not . inquire d) [top b, left b, bottom b, right b]
 
 compose :: [a -> a] -> a -> a
 compose fs v = foldl (flip (.)) id fs $ v
