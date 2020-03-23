@@ -31,6 +31,10 @@ instance Packable (QDiagram B V2 Double Any) where
 
 instance IsName FullName
 
+data Step = Step { pos :: (Point V2 Double)
+                 , nextStep :: Step
+                 }
+
 layoutDiagramsAsGrid = maybe (strutX 0) (travelPacked (frame 1) (|||) (===)) . pack . map draw
 
 dashed  = dashingN [0.03,0.03] 0
@@ -124,46 +128,54 @@ drawDependencies types diag = compose (concatMap (drawDependenciesForType diag t
         drawDependenciesForType diag types c = map fromJust $ filter isJust $ map (\ (d,a) -> drawDependency (fullname c) d a (map fullname types) diag) $ zip (dependencies c) $ brewerSet Paired (length $ dependencies c)
 
 drawDependency :: FullName -> FullName -> Colour Double -> [FullName] -> (QDiagram B V2 Double Any) -> Maybe (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
-drawDependency c d a types diag = do
-    rb <- lookupName c diag
-    cb <- lookupName d diag
-    let v = location rb .-. location cb
-    let v2 = location cb .-. location rb
-    let b1 = boundaryFrom rb v2
-    let b2 = boundaryFrom cb v
-    let allClassDiagrams = map getSub $ map fromJust $ filter isJust $ map (flip lookupName diag) $ types \\ [c, d]
-    let fullpath = drawDArrow b1 b2 allClassDiagrams
+drawDependency r d a types diag = do
+    rootClass <- lookupName r diag
+    destinationClass <- lookupName d diag
+    let rootToDestV = mkUnitV $ location destinationClass .-. location rootClass
+    let destToRootV = turnAround rootToDestV
+    let pointOnRootBoundary = boundaryFrom rootClass rootToDestV
+    let pointOnDestBoundary = boundaryFrom destinationClass destToRootV
+    let allClassDiagrams = map getSub $ map fromJust $ filter isJust $ map (flip lookupName diag) $ types \\ [r, d]
+    let fullpath = drawDArrow pointOnRootBoundary pointOnDestBoundary allClassDiagrams
     let trail = fromVertices fullpath
     let arrow = (lw 0.3 . mconcat . zipWith lc colors . map strokeLocTrail . explodeTrail) trail
-    let FullName cns _ = c
+    let FullName cns _ = r
     let FullName dns _ = d
     return (atop ((arrow # lw 0.3) # (svgClass "dependency ") 
                                    # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " "))))
 
 colors = cycle [aqua, orange, deeppink, blueviolet, crimson, darkgreen]
 
+mkUnitV = fromDirection . direction
+
+turnAround = rotate halfTurn
+
 drawDArrow :: (Point V2 Double) -> (Point V2 Double) -> [QDiagram B V2 Double Any] -> [Point V2 Double]
 drawDArrow start end allClassDiagrams = start : (drawFromTo start end) ++ [end]
     where
         drawFromTo start end = 
             let 
-                dir = scale 5 $ fromDirection $ direction (end .-. start)
-                backtrack = rotate halfTurn dir
-                nextStep = start .+^ dir
+                dir = stepDir start end
+                nextStep =  start .+^ dir
                 (x :& _) = coords nextStep
                 (xEnd :& _) = coords end
-                continue = (D.trace (show (x, xEnd))) $ floor x == floor xEnd
+                continue = floor x /= floor xEnd
             in 
                 if (continue) then
                     case (headMay $ filter (flip inquire nextStep) allClassDiagrams) of
                         Just d -> 
                             let 
-                                adjusted = around start d end backtrack 
+                                adjustmentDir = around d end start
+                                adjusted = adjustP start d end adjustmentDir
                             in
                                 drawFromTo adjusted end ++ [adjusted, start]
                         Nothing -> drawFromTo nextStep end
                 else
                     []
+
+stepD = 3
+
+stepDir s e = scale stepD $ mkUnitV (e .-. s)
 
 keep xs@(x:_) f = x : (keep' xs f)
 keep [] f = []
@@ -172,12 +184,18 @@ keep' [] _ = []
 keep' (x:xx:xs) f = (keep (f x xx) f) ++ (keep (xx:xs) f)
 keep' (x:[]) _ = [x]
 
-top b = b .+^ (0 ^& 5)
-left b = b .+^ ((-5) ^& 0)
-bottom b = b .+^ (0 ^& (-5)) 
-right b = b .+^ (5 ^& 0) 
-around :: (Point V2 Double) -> (QDiagram B V2 Double Any) -> (Point V2 Double) -> V2 Double -> (Point V2 Double)
-around b d destination backtrack = head $ sortOn (pointsDistance destination) $ filter (not . inquire d) [top b, left b, bottom b, right b]
+top = flip (.+^) (0 ^& stepD)
+left = flip (.+^) ((-stepD) ^& 0)
+bottom = flip (.+^) (0 ^& (-stepD)) 
+right = flip (.+^) (stepD ^& 0) 
+around d destination b = head $ sortOn (\ a -> pointsDistance destination (a b)) $ filter (\ a -> not $ inquire d (a b)) [top, left, bottom, right]
+
+adjustP p d end adjustmentDir = 
+    let
+        dir = (D.trace (show p)) stepDir p end
+        nextStep = p .+^ dir
+    in
+        if inquire d nextStep then adjustP (adjustmentDir p) d end adjustmentDir else p
 
 compose :: [a -> a] -> a -> a
 compose fs v = foldl (flip (.)) id fs $ v

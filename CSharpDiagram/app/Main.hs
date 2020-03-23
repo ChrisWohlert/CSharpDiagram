@@ -16,7 +16,7 @@ import qualified System.IO.Strict as S
 
 main = do
     print "Parsing"
-    solution <- parseFiles "C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram" --"D:/haskell/CSharpDiagram/CSharpDiagram"
+    solution <- parseFiles "D:/haskell/CSharpDiagram/CSharpDiagram" --"C:/Users/CWO/source/github/CSharpDiagram/CSharpDiagram/CSharpDiagram"
     print "Creating diagram"
     renderSVG "test.svg" (dims 1600) (draw solution)
     print "Updating index.html"
