@@ -62,3 +62,4 @@ tests:
     - -fwarn-incomplete-patterns 
     dependencies:
     - CSharpDiagram
+    - hspec

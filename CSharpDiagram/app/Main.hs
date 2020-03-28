@@ -7,7 +7,7 @@ module Main where
 
 import Diagrams.Prelude
 import Diagrams.Backend.SVG
-import Lib
+import CSParser
 import Class
 import Drawing
 import System.IO

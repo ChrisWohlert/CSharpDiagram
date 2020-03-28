@@ -1,4 +1,4 @@
-module Lib
+module CSParser
     ( run_parse
     , run_parseType
     , parseClass

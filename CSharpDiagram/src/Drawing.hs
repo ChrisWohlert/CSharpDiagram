@@ -7,7 +7,8 @@ module Drawing where
 
 import Diagrams.Prelude
 import Diagrams.Backend.SVG
-import Lib
+import CSParser
+import PathNavigator
 import Class
 import Data.List
 import Packer
@@ -30,10 +31,6 @@ instance Packable (QDiagram B V2 Double Any) where
     packingDims d = (width d, height d)
 
 instance IsName FullName
-
-data Step = Step { pos :: (Point V2 Double)
-                 , nextStep :: Step
-                 }
 
 layoutDiagramsAsGrid = maybe (strutX 0) (travelPacked (frame 1) (|||) (===)) . pack . map draw
 
