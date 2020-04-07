@@ -45,7 +45,7 @@ buildPath root (Pair(endX, endY)) cost = buildP (M.singleton root (0, root, Visi
                     markAsVisited = M.update (\ (c, a, v) -> Just (c, a, Visited)) node updatedNodes
                     nextNode = (getNextNode markAsVisited)
                 in
-                    buildP markAsVisited (D.trace (show nextNode) nextNode) 
+                    buildP markAsVisited nextNode
         chooseCheapest (c1, a1, v1) (c2, a2, v2) = if c1 < c2 then (c1, a1, v1) else (c2, a2, v2)
         getCost nodes node 
             | M.notMember node nodes = 0

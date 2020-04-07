@@ -9,6 +9,7 @@ import Diagrams.Prelude
 import Diagrams.Backend.SVG
 import CSParser
 import PathNavigator
+import qualified TwoDVector as TwoD
 import Class
 import Data.List
 import Packer
@@ -122,7 +123,7 @@ drawDependencies :: [Type] -> (QDiagram B V2 Double Any) -> (QDiagram B V2 Doubl
 drawDependencies types diag = compose (concatMap (drawDependenciesForType diag types) (take 1 $ types)) diag
     where
         drawDependenciesForType :: QDiagram B V2 Double Any -> [Type] -> Type -> [(QDiagram B V2 Double Any -> QDiagram B V2 Double Any)]
-        drawDependenciesForType diag types c = map fromJust $ filter isJust $ map (\ (d,a) -> drawDependency (fullname c) d a (map fullname types) diag) $ zip (dependencies c) $ brewerSet Paired (length $ dependencies c)
+        drawDependenciesForType diag types c = map fromJust $ filter isJust $ map (\ (d,a) -> drawDependency (fullname c) d a (map fullname types) diag) $ zip (take 1 $ dependencies c) $ brewerSet Paired (length $ dependencies c)
 
 drawDependency :: FullName -> FullName -> Colour Double -> [FullName] -> (QDiagram B V2 Double Any) -> Maybe (QDiagram B V2 Double Any -> QDiagram B V2 Double Any)
 drawDependency r d a types diag = do
@@ -132,18 +133,25 @@ drawDependency r d a types diag = do
     let destToRootV = turnAround rootToDestV
     let pointOnRootBoundary = boundaryFrom rootClass rootToDestV
     let pointOnDestBoundary = boundaryFrom destinationClass destToRootV
-    let allClassDiagrams = map getSub $ map fromJust $ filter isJust $ map (flip lookupName diag) $ types \\ [r, d]
-    let fullpath = drawDArrow pointOnRootBoundary pointOnDestBoundary allClassDiagrams
-    let trail = fromVertices fullpath
+    let allClassDiagrams = map fromJust $ filter isJust $ map (flip lookupName diag) $ types \\ [r, d]
+    let collidables = map mkCollidable allClassDiagrams
+    let collidablesInProblemSpace = filterCollidableToProblemSpace (TwoD.Point (unp2 pointOnRootBoundary)) (TwoD.Point (unp2 pointOnDestBoundary)) collidables
+    let fullpath = getPath (TwoD.Point (unp2 pointOnRootBoundary)) (TwoD.Point (unp2 pointOnDestBoundary)) collidablesInProblemSpace
+    let trail = fromVertices $ map toDiagramsPoint ((D.trace (show fullpath)) fullpath)
     let arrow = (lw 0.3 . mconcat . zipWith lc colors . map strokeLocTrail . explodeTrail) trail
     let FullName cns _ = r
     let FullName dns _ = d
-    return (atop ((arrow # lw 0.3) # (svgClass "dependency ") 
-                                   # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " "))))
+    return (atop (arrow # lw 0.3 
+                        # (svgClass "dependency ") 
+                        # (svgClass ("dependency-" ++ (filter (/= '.') cns) ++ " "))))
 
 colors = cycle [aqua, orange, deeppink, blueviolet, crimson, darkgreen]
 
 mkUnitV = fromDirection . direction
+
+mkCollidable c = Collidable (unp2 (location c)) (width c) (height c)
+
+toDiagramsPoint (TwoD.Point (x, y)) = p2 (x, y)
 
 turnAround = rotate halfTurn
 
@@ -189,7 +197,7 @@ around d destination b = head $ sortOn (\ a -> pointsDistance destination (a b))
 
 adjustP p d end adjustmentDir = 
     let
-        dir = (D.trace (show p)) stepDir p end
+        dir = stepDir p end
         nextStep = p .+^ dir
     in
         if inquire d nextStep then adjustP (adjustmentDir p) d end adjustmentDir else p
