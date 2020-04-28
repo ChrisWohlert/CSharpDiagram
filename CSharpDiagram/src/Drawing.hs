@@ -43,19 +43,19 @@ instance Drawing Solution where
 instance Drawing Namespace where
     draw (Namespace name nss types) = 
         let 
-            headerSize = if not ('.' `elem` name) then 10 else 6
+            headerSize = if '.' `notElem` name then 10 else 6
             header = splitOn "." name # intercalate ".\n"  # p # scale headerSize # frame 5 
             drawnNamespaces = layoutDiagramsAsGrid nss
             drawnTypes = layoutDiagramsAsGrid types
         in
             header === (drawnTypes === drawnNamespaces) # boundByRect 0.6 # svgClass "namespace " # svgClass (filter (/= '.') name)
 
-boundByRect w contents = contents <> (boundingRect contents) # lw w
+boundByRect w contents = contents <> boundingRect contents # lw w
 
 instance Drawing Type where
     draw c@(Class _ ns _ _ _ _ name _ _ members _ _) = contents # boundByRect 0.3 # fc lightgrey # named (fullname c) # frame 7 # svgClass "class "
         where 
-            contents = strutY 1 === vsep memberSpace ([draw name] ++ map draw members) # fc black
+            contents = strutY 1 === vsep memberSpace (draw name : map draw members) # fc black
     draw _ = strutY 10
 
 instance Drawing ClassName where
@@ -137,7 +137,7 @@ drawDependency r d a types diag = do
     let collidables = map mkCollidable allClassDiagrams
     let collidablesInProblemSpace = filterCollidableToProblemSpace (TwoD.Point (unp2 pointOnRootBoundary)) (TwoD.Point (unp2 pointOnDestBoundary)) collidables
     let fullpath = getPath (TwoD.Point (unp2 pointOnRootBoundary)) (TwoD.Point (unp2 pointOnDestBoundary)) collidablesInProblemSpace
-    let trail = fromVertices $ map toDiagramsPoint ((D.trace (show fullpath)) fullpath)
+    let trail = fromVertices $ map toDiagramsPoint fullpath
     let arrow = (lw 0.3 . mconcat . zipWith lc colors . map strokeLocTrail . explodeTrail) trail
     let FullName cns _ = r
     let FullName dns _ = d
@@ -151,63 +151,10 @@ mkUnitV = fromDirection . direction
 
 mkCollidable c = Collidable (unp2 (location c)) (width c) (height c)
 
+toDiagramsPoint :: TwoD.Point -> P2 Double
 toDiagramsPoint (TwoD.Point (x, y)) = p2 (x, y)
 
 turnAround = rotate halfTurn
 
-drawDArrow :: (Point V2 Double) -> (Point V2 Double) -> [QDiagram B V2 Double Any] -> [Point V2 Double]
-drawDArrow start end allClassDiagrams = start : (drawFromTo start end) ++ [end]
-    where
-        drawFromTo start end = 
-            let 
-                dir = stepDir start end
-                nextStep =  start .+^ dir
-                (x :& _) = coords nextStep
-                (xEnd :& _) = coords end
-                continue = floor x /= floor xEnd
-            in 
-                if (continue) then
-                    case (headMay $ filter (flip inquire nextStep) allClassDiagrams) of
-                        Just d -> 
-                            let 
-                                adjustmentDir = around d end start
-                                adjusted = adjustP start d end adjustmentDir
-                            in
-                                drawFromTo adjusted end ++ [adjusted, start]
-                        Nothing -> drawFromTo nextStep end
-                else
-                    []
-
-stepD = 3
-
-stepDir s e = scale stepD $ mkUnitV (e .-. s)
-
-keep xs@(x:_) f = x : (keep' xs f)
-keep [] f = []
-
-keep' [] _ = []
-keep' (x:xx:xs) f = (keep (f x xx) f) ++ (keep (xx:xs) f)
-keep' (x:[]) _ = [x]
-
-top = flip (.+^) (0 ^& stepD)
-left = flip (.+^) ((-stepD) ^& 0)
-bottom = flip (.+^) (0 ^& (-stepD)) 
-right = flip (.+^) (stepD ^& 0) 
-around d destination b = head $ sortOn (\ a -> pointsDistance destination (a b)) $ filter (\ a -> not $ inquire d (a b)) [top, left, bottom, right]
-
-adjustP p d end adjustmentDir = 
-    let
-        dir = stepDir p end
-        nextStep = p .+^ dir
-    in
-        if inquire d nextStep then adjustP (adjustmentDir p) d end adjustmentDir else p
-
 compose :: [a -> a] -> a -> a
 compose fs v = foldl (flip (.)) id fs $ v
-
-pointsDistance p1 p2 = 
-    let
-        (x1 :& y1) = coords p1
-        (x2 :& y2) = coords p2
-    in 
-        sqrt $ (x2 - x1) ** 2 + (y2 - y1) ** 2
